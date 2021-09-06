@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import settings
+from class_predefined_points import PredefinedPoints
 
 
 class Trade:
@@ -128,8 +129,10 @@ def main():
     test_scale = data_object.scale_coordinates(converted, factor=10.0)
     test_velocity = data_object.get_mean_velocity(test_scale)
     test_com = data_object.get_com(test_scale)
-    test_distance = data_object.get_com_distance_list(test_scale, test_com)
-    data_object.get_plot(converted, test_scale, test_com, filename='interview_task_plot.jpg')
+    pred_object = PredefinedPoints(filename='predefined_points.csv', points_number=100)
+    additional_data = pred_object.get_signal_from_file()
+    test_distance = data_object.get_com_distance_list(additional_data, test_com)
+    data_object.get_plot(converted, additional_data, test_com, filename='interview_task_plot.jpg')
 
     print('Test running... data loaded from csv')
 
