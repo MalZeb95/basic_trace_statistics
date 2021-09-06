@@ -5,6 +5,7 @@ Predefined points used in get_com_distance_list can be generated and saved to fi
 """
 
 import pandas as pd
+import math
 import settings
 
 
@@ -32,6 +33,7 @@ class Trade:
         string_column = column_names[col_str_index]
         data[string_column] = pd.to_datetime(data[string_column], format='%Y-%m-%d %H:%M:%S.%f')
         data[string_column] = data[string_column].dt.strftime('%S.%f')
+        data[string_column] = data[string_column].astype(float)
         data = data.rename(columns={string_column: "time"})
         return data
 
@@ -60,6 +62,20 @@ class Trade:
 
         return data
 
+    def get_mean_velocity(self, data):
+        """
+        Function return mean velocity of trace based on x,y coordinates and time vector
+        :param data: DataFrame with coordinates and time
+        :return: data
+        """
+        diff_data = data.diff()
+        velocity_x = diff_data['x']/diff_data['time']
+        velocity_y = diff_data['y'] / diff_data['time']
+        mean_velocity_temp = velocity_x.pow(2).add(velocity_y.pow(2))
+        mean_velocity = mean_velocity_temp.pow(0.5)
+
+        return mean_velocity
+
 
 def main():
 
@@ -67,7 +83,8 @@ def main():
     data_object = Trade(file_path=file)
     dane = data_object.data
     converted = data_object.get_timestamp_from_string(data=dane, col_str_index=0)
-    test = data_object.scale_coordinates(converted)
+    test_scale = data_object.scale_coordinates(converted)
+    test_velocity = data_object.get_mean_velocity(test_scale)
 
     print('Test running... data loaded from csv')
 
