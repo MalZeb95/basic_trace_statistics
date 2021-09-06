@@ -63,6 +63,19 @@ class Trade:
         data['y'] = data['y']*factor
         return data
 
+    def convert_reference_frame(self, data, displacement_vector=None):
+        """
+        Function convert reference frame into another used discplacement_vector
+        :param displacement_vector:
+        :return:
+        """
+        if displacement_vector is None:
+            displacement_vector = [0, 0]
+
+        data['x'] = data['x'].subtract(displacement_vector[0])
+        data['x'] = data['x'].subtract(displacement_vector[1])
+        return data
+
     def get_mean_velocity(self, data):
         """
         Function calculate mean velocity of drawn trace based on (x,y) coordinates and time vector
@@ -127,12 +140,13 @@ def main():
     dane = data_object.data
     converted = data_object.get_timestamp_from_string(data=dane, col_str_index=0)
     test_scale = data_object.scale_coordinates(converted, factor=10.0)
+    moved_data_test = data_object.convert_reference_frame(test_scale, displacement_vector=[10,10])
     test_velocity = data_object.get_mean_velocity(test_scale)
     test_com = data_object.get_com(test_scale)
     pred_object = PredefinedPoints(filename='predefined_points.csv', points_number=100)
     additional_data = pred_object.get_signal_from_file()
     test_distance = data_object.get_com_distance_list(additional_data, test_com)
-    data_object.get_plot(converted, additional_data, test_com, filename='interview_task_plot.jpg')
+    data_object.get_plot(moved_data_test, additional_data, test_com, filename='interview_task_plot.jpg')
 
     print('Test running... data loaded from csv')
 
