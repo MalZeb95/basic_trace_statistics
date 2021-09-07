@@ -21,23 +21,20 @@ class Trade:
     """
     def __init__(self, file_path, separator='\t'):
         self.data = pd.read_csv(file_path, sep=separator)
-        self.x_coordinates = self.data['x']
-        self.y_coordinates = self.data['y']
 
-    def get_timestamp_from_string(self, data, col_str_index=0):
+    def convert_string_column_to_time(self, col_str_index=0):
         """
         Function convert first column with string (info about date and time sample) into time vector
         :param data: DataFrame with signals and string column(data and time)
         :param col_str_index: index of string column
         :return: data
         """
-        column_names = data.columns
+        column_names = self.data.columns
         string_column = column_names[col_str_index]
-        data[string_column] = pd.to_datetime(data[string_column], format='%Y-%m-%d %H:%M:%S.%f')
-        data[string_column] = data[string_column].dt.strftime('%S.%f')
-        data[string_column] = data[string_column].astype(float)
-        data = data.rename(columns={string_column: "time"})
-        return data
+        self.data[string_column] = pd.to_datetime(self.data[string_column], format='%Y-%m-%d %H:%M:%S.%f')
+        self.data[string_column] = self.data[string_column].dt.strftime('%S.%f')
+        self.data[string_column] = self.data[string_column].astype(float)
+        self.data = self.data.rename(columns={string_column: "time"})
 
     def resample_data(self, data, origin_freq_hz=50, expected_freq_hz=20):
         """
@@ -52,80 +49,75 @@ class Trade:
         print('test resample')
         return test
 
-    def scale_coordinates(self, data, factor=10.0):
+    def scale_coordinates(self, factor=10.0):
         """
         Fuction which scales coordinates by multiplying x,y values with factor
         :param data: data in DataFrame
         :param factor: scalar for scaling coordinates
         :return: data
         """
-        data['x'] = data['x']*factor
-        data['y'] = data['y']*factor
-        return data
+        self.data['x'] = self.data['x']*factor
+        self.data['y'] = self.data['y']*factor
 
-    def convert_reference_frame(self, data, displacement_vector=None):
+    def convert_reference_frame(self, displacement_vector=(0, 0)):
         """
         Function convert reference frame into another used discplacement_vector
         :param displacement_vector:
         :return:
         """
-        if displacement_vector is None:
-            displacement_vector = [0, 0]
+        self.data['x'] = self.data['x'].subtract(displacement_vector[0])
+        self.data['x'] = self.data['x'].subtract(displacement_vector[1])
 
-        data['x'] = data['x'].subtract(displacement_vector[0])
-        data['x'] = data['x'].subtract(displacement_vector[1])
-        return data
-
-    def get_mean_velocity(self, data):
+    def get_mean_velocity(self):
         """
         Function calculate mean velocity of drawn trace based on (x,y) coordinates and time vector
         :param data: DataFrame with coordinates and time
         :return: data
         """
-        diff_data = data.diff()
+        diff_data = self.data.diff()
         velocity_x = diff_data['x']/diff_data['time']
         velocity_y = diff_data['y'] / diff_data['time']
         mean_velocity_temp = velocity_x.pow(2).add(velocity_y.pow(2))
         mean_velocity = mean_velocity_temp.pow(0.5)
         return mean_velocity
 
-    def get_com(self, data):
+    def get_com(self):
         """
         Fuction calculate center of mass of signal as a list with two elements [x_com, y_com]
         :param data:
         :return:
         """
-        x_com = data['x'].mean()
-        y_com = data['y'].mean()
-        return [x_com, y_com]
+        x_com = self.data['x'].mean()
+        y_com = self.data['y'].mean()
+        return x_com, y_com
 
-    def get_com_distance_list(self, predefined_points, com):
+    def get_com_distance_list(self, predefined_points):
         """
         Function generate list of distances between given (x,y) coordinates and center of mass from original .csv data
         :param predefined_points: DataFrame with two columns ['x' and 'y']
-        :param com: center of mass as a list with x, y coordinates
         :return: list
         """
-        distances_x = predefined_points['x'].subtract(com[0]).pow(2)
-        distances_y = predefined_points['y'].subtract(com[1]).pow(2)
+        com_x, com_y = self.get_com()
+        distances_x = predefined_points['x'].subtract(com_x).pow(2)
+        distances_y = predefined_points['y'].subtract(com_y).pow(2)
         distances_temp = distances_x.add(distances_y)
         distances = distances_temp.pow(0.5).tolist()
         return distances
 
-    def get_plot(self, data, predefined_points, com, filename):
+    def get_plot(self, predefined_points, filename):
         """
         Function to visualize trace, center of mass and predefined points
         :param data: DataFrame with x,y coordinates
         :param predefined_points: dataframe with predefined points
-        :param com: center of mass as a list with x,y
         :param filename: string with extension
         :return:
         """
 
         fig, ax = plt.subplots()
-        ax.plot(data['x'], data['y'])
+        ax.plot(self.data['x'], self.data['y'])
         ax.scatter(predefined_points['x'], predefined_points['y'])
-        ax.scatter(com[0], com[1])
+        com_x, com_y = self.get_com()
+        ax.scatter(com_x, com_y)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.legend(['data', 'predefined', 'com'])
@@ -135,18 +127,16 @@ class Trade:
 
 def main():
 
-    file = settings.DATA_PATH
-    data_object = Trade(file_path=file)
-    dane = data_object.data
-    converted = data_object.get_timestamp_from_string(data=dane, col_str_index=0)
-    test_scale = data_object.scale_coordinates(converted, factor=10.0)
-    moved_data_test = data_object.convert_reference_frame(test_scale, displacement_vector=[10,10])
-    test_velocity = data_object.get_mean_velocity(test_scale)
-    test_com = data_object.get_com(test_scale)
+    data_object = Trade(file_path=settings.DATA_PATH)
+    data_object.convert_string_column_to_time(col_str_index=0)
+    data_object.scale_coordinates(factor=10.0)
+    data_object.convert_reference_frame(displacement_vector=(10, 10))
+    test_velocity = data_object.get_mean_velocity()
+    test_com = data_object.get_com()
     pred_object = PredefinedPoints(filename='predefined_points.csv', points_number=100)
     additional_data = pred_object.get_signal_from_file()
-    test_distance = data_object.get_com_distance_list(additional_data, test_com)
-    data_object.get_plot(moved_data_test, additional_data, test_com, filename='interview_task_plot.jpg')
+    test_distance = data_object.get_com_distance_list(additional_data)
+    data_object.get_plot(additional_data, filename='interview_task_plot.jpg')
 
     print('Test running... data loaded from csv')
 
