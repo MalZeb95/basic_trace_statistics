@@ -4,11 +4,9 @@ Module contains main core of initial analysis of trade and functions which uploa
 Predefined points used in get_com_distance_list can be generated and saved to file -> class PredefinedPoints
 """
 import os
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import settings
-from class_predefined_points import PredefinedPoints
 
 
 class Trade:
@@ -20,21 +18,14 @@ class Trade:
     - visualisation of the trace, center of mass and predefined points.
     """
     def __init__(self, file_path, separator='\t'):
-        self.data = pd.read_csv(file_path, sep=separator)
 
-    def convert_string_column_to_time(self, col_str_index=0):
-        """
-        Function convert first column with string (info about date and time sample) into time vector
-        :param data: DataFrame with signals and string column(data and time)
-        :param col_str_index: index of string column
-        :return: data
-        """
+        self.data = pd.read_csv(file_path, sep=separator)
+        col_str_index = 0
         column_names = self.data.columns
         string_column = column_names[col_str_index]
         self.data[string_column] = pd.to_datetime(self.data[string_column], format='%Y-%m-%d %H:%M:%S.%f')
-        self.data[string_column] = self.data[string_column].dt.strftime('%S.%f')
-        self.data[string_column] = self.data[string_column].astype(float)
-        self.data = self.data.rename(columns={string_column: "time"})
+        time_series = self.data[string_column].dt.strftime('%S.%f').astype(float)
+        self.data['time'] = time_series
 
     def resample_data(self, data, origin_freq_hz=50, expected_freq_hz=20):
         """
@@ -91,20 +82,20 @@ class Trade:
         y_com = self.data['y'].mean()
         return x_com, y_com
 
-    def get_com_distance_list(self, predefined_points):
+    def get_com_distance_list(self):
         """
         Function generate list of distances between given (x,y) coordinates and center of mass from original .csv data
-        :param predefined_points: DataFrame with two columns ['x' and 'y']
         :return: list
         """
         com_x, com_y = self.get_com()
+        predefined_points = pd.read_csv(settings.PREDEFINED_POINTS_PATH)
         distances_x = predefined_points['x'].subtract(com_x).pow(2)
         distances_y = predefined_points['y'].subtract(com_y).pow(2)
         distances_temp = distances_x.add(distances_y)
         distances = distances_temp.pow(0.5).tolist()
         return distances
 
-    def get_plot(self, predefined_points, filename):
+    def get_plot(self, filename):
         """
         Function to visualize trace, center of mass and predefined points
         :param data: DataFrame with x,y coordinates
@@ -115,6 +106,7 @@ class Trade:
 
         fig, ax = plt.subplots()
         ax.plot(self.data['x'], self.data['y'])
+        predefined_points = pd.read_csv(settings.PREDEFINED_POINTS_PATH)
         ax.scatter(predefined_points['x'], predefined_points['y'])
         com_x, com_y = self.get_com()
         ax.scatter(com_x, com_y)
@@ -128,17 +120,16 @@ class Trade:
 def main():
 
     data_object = Trade(file_path=settings.DATA_PATH)
-    data_object.convert_string_column_to_time(col_str_index=0)
     data_object.scale_coordinates(factor=10.0)
     data_object.convert_reference_frame(displacement_vector=(10, 10))
     test_velocity = data_object.get_mean_velocity()
     test_com = data_object.get_com()
-    pred_object = PredefinedPoints(filename='predefined_points.csv', points_number=100)
-    additional_data = pred_object.get_signal_from_file()
-    test_distance = data_object.get_com_distance_list(additional_data)
-    data_object.get_plot(additional_data, filename='interview_task_plot.jpg')
+    test_distance = data_object.get_com_distance_list()
+    data_object.get_plot(filename='interview_task_plot.jpg')
 
-    print('Test running... data loaded from csv')
+    print(f'Trade statistics:\n 1. CENTER OF MASS:{test_com}, '
+          f'\n 3. MEAN VELOCITY: {test_velocity}'
+          f'\n 2. DISTANCES: {test_distance}')
 
 
 if __name__ == '__main__':

@@ -5,3 +5,4 @@ import unittest
 
 
 class TestTrade(unittest.TestCase):
+    pass
