@@ -50,14 +50,14 @@ class Trade:
         self.data['x'] = self.data['x']*factor
         self.data['y'] = self.data['y']*factor
 
-    def convert_reference_frame(self, displacement_vector=(0, 0)):
+    def convert_reference_frame(self, displacement_vector=(0.0, 0.0)):
         """
         Function convert reference frame into another used discplacement_vector
         :param displacement_vector:
         :return:
         """
         self.data['x'] = self.data['x'].subtract(displacement_vector[0])
-        self.data['x'] = self.data['x'].subtract(displacement_vector[1])
+        self.data['y'] = self.data['y'].subtract(displacement_vector[1])
 
     def get_mean_velocity(self):
         """
@@ -116,14 +116,8 @@ class Trade:
         plt.savefig(os.path.join(settings.REPORTS_PATH, filename))
         plt.show()
 
-    def get_x(self):
-        return self.data['x']
-
-    def get_y(self):
-        return self.data['y']
-
-    def get_time(self):
-        return self.data['time']
+    def get_data(self):
+        return self.data
 
 
 def main():
@@ -135,9 +129,6 @@ def main():
     test_com = data.get_com()
     test_distance = data.get_com_distance_list()
     data.get_plot(filename='interview_task_plot.jpg')
-    x = data.get_x()
-    y = data.get_y()
-    time = data.get_time()
 
     print(f'Trade statistics:\n 1. CENTER OF MASS:{test_com}, '
           f'\n 3. MEAN VELOCITY: {test_velocity}'
