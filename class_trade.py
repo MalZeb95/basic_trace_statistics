@@ -19,7 +19,7 @@ class Trade:
     """
     def __init__(self, file_path, separator='\t'):
 
-        self.data = pd.read_csv(file_path, sep=separator)
+        self.data = pd.read_csv(file_path, sep=separator, dtype={'Unnamed: 0': str, 'x': float, 'y': float})
         col_str_index = 0
         column_names = self.data.columns
         string_column = column_names[col_str_index]
@@ -116,16 +116,28 @@ class Trade:
         plt.savefig(os.path.join(settings.REPORTS_PATH, filename))
         plt.show()
 
+    def get_x(self):
+        return self.data['x']
+
+    def get_y(self):
+        return self.data['y']
+
+    def get_time(self):
+        return self.data['time']
+
 
 def main():
 
-    data_object = Trade(file_path=settings.DATA_PATH)
-    data_object.scale_coordinates(factor=10.0)
-    data_object.convert_reference_frame(displacement_vector=(10, 10))
-    test_velocity = data_object.get_mean_velocity()
-    test_com = data_object.get_com()
-    test_distance = data_object.get_com_distance_list()
-    data_object.get_plot(filename='interview_task_plot.jpg')
+    data = Trade(file_path=settings.DATA_PATH)
+    data.scale_coordinates(factor=10.0)
+    data.convert_reference_frame(displacement_vector=(10, 10))
+    test_velocity = data.get_mean_velocity()
+    test_com = data.get_com()
+    test_distance = data.get_com_distance_list()
+    data.get_plot(filename='interview_task_plot.jpg')
+    x = data.get_x()
+    y = data.get_y()
+    time = data.get_time()
 
     print(f'Trade statistics:\n 1. CENTER OF MASS:{test_com}, '
           f'\n 3. MEAN VELOCITY: {test_velocity}'
