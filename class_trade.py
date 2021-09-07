@@ -82,13 +82,13 @@ class Trade:
         y_com = self.data['y'].mean()
         return x_com, y_com
 
-    def get_com_distance_list(self):
+    def get_com_distance_list(self, predefined_points_path, separator):
         """
         Function generate list of distances between given (x,y) coordinates and center of mass from original .csv data
         :return: list
         """
         com_x, com_y = self.get_com()
-        predefined_points = pd.read_csv(settings.PREDEFINED_POINTS_PATH)
+        predefined_points = pd.read_csv(predefined_points_path, sep=separator)
         distances_x = predefined_points['x'].subtract(com_x).pow(2)
         distances_y = predefined_points['y'].subtract(com_y).pow(2)
         distances_temp = distances_x.add(distances_y)
@@ -127,7 +127,7 @@ def main():
     data.convert_reference_frame(displacement_vector=(10, 10))
     test_velocity = data.get_mean_velocity()
     test_com = data.get_com()
-    test_distance = data.get_com_distance_list()
+    test_distance = data.get_com_distance_list(settings.PREDEFINED_POINTS_PATH)
     data.get_plot(filename='interview_task_plot.jpg')
 
     print(f'Trade statistics:\n 1. CENTER OF MASS:{test_com}, '
