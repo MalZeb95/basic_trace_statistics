@@ -6,6 +6,7 @@ Predefined points used in get_com_distance_list can be generated and saved to fi
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import timedelta
 import settings
 
 
@@ -20,14 +21,10 @@ class Trade:
     def __init__(self, file_path, separator='\t'):
 
         self.data = pd.read_csv(file_path, sep=separator, dtype={'Unnamed: 0': str, 'x': float, 'y': float})
-        col_str_index = 0
-        column_names = self.data.columns
-        string_column = column_names[col_str_index]
-        self.data[string_column] = pd.to_datetime(self.data[string_column], format='%Y-%m-%d %H:%M:%S.%f')
-        time_series = self.data[string_column].dt.strftime('%S.%f').astype(float)
-        self.data['time'] = time_series
+        self.datetime_column = 'Unnamed: 0'  # Name of column with time and date string
+        self.data[self.datetime_column] = pd.to_datetime(self.data[self.datetime_column], format='%Y-%m-%d %H:%M:%S.%f')
 
-    def resample_data(self, data, origin_freq_hz=50, expected_freq_hz=20):
+    def resample_data(self, expected_freq_hz=20):
         """
         Function convert signal sampled with origin_freq_hz frequency into expected_freq_hz
         :param data: data as DataFrame
@@ -36,7 +33,10 @@ class Trade:
         :return: data
         """
         # dorobić tą funkcję lepiej Bo nie działa!!!!!!!!!!!!!!!!!!!!!
-        test = data.resample('50ms')
+        self.data[string_column].subtract(self.data[string_column][0]).dt.total_seconds()
+        timedelta_test = timedelta(seconds=expected_freq_hz/1)
+
+        test = self.data.resample(rule=timedelta_test)
         print('test resample')
         return test
 
@@ -61,13 +61,14 @@ class Trade:
 
     def get_mean_velocity(self):
         """
-        Function calculate mean velocity of drawn trace based on (x,y) coordinates and time vector
+        Function calculate mean velocity of drawn trace based on (x,y) coordinates and datetime vector.
+        First value is NaN due to the differences calculated between neighboring elements.
         :param data: DataFrame with coordinates and time
         :return: data
         """
         diff_data = self.data.diff()
-        velocity_x = diff_data['x']/diff_data['time']
-        velocity_y = diff_data['y'] / diff_data['time']
+        velocity_x = diff_data['x'] / diff_data[self.datetime_column].dt.total_seconds()
+        velocity_y = diff_data['y'] / diff_data[self.datetime_column].dt.total_seconds()
         mean_velocity_temp = velocity_x.pow(2).add(velocity_y.pow(2))
         mean_velocity = mean_velocity_temp.pow(0.5)
         return mean_velocity
@@ -82,20 +83,19 @@ class Trade:
         y_com = self.data['y'].mean()
         return x_com, y_com
 
-    def get_com_distance_list(self, predefined_points_path, separator):
+    def get_com_distance_list(self, predefined_points):
         """
-        Function generate list of distances between given (x,y) coordinates and center of mass from original .csv data
+        Function generate list of distances between predefined points (x,y) and center of mass from original .csv data
         :return: list
         """
         com_x, com_y = self.get_com()
-        predefined_points = pd.read_csv(predefined_points_path, sep=separator)
         distances_x = predefined_points['x'].subtract(com_x).pow(2)
         distances_y = predefined_points['y'].subtract(com_y).pow(2)
         distances_temp = distances_x.add(distances_y)
         distances = distances_temp.pow(0.5).tolist()
         return distances
 
-    def get_plot(self, filename):
+    def get_plot(self, filename, predefined_points=None):
         """
         Function to visualize trace, center of mass and predefined points
         :param data: DataFrame with x,y coordinates
@@ -104,15 +104,16 @@ class Trade:
         :return:
         """
 
+        com_x, com_y = self.get_com()
         fig, ax = plt.subplots()
         ax.plot(self.data['x'], self.data['y'])
-        predefined_points = pd.read_csv(settings.PREDEFINED_POINTS_PATH)
-        ax.scatter(predefined_points['x'], predefined_points['y'])
-        com_x, com_y = self.get_com()
-        ax.scatter(com_x, com_y)
+        ax.scatter(com_x, com_y, c='orange')
         ax.set_xlabel('x')
         ax.set_ylabel('y')
-        ax.legend(['data', 'predefined', 'com'])
+        ax.legend(['data', 'COM'])
+        if predefined_points is not None:
+            ax.scatter(predefined_points['x'], predefined_points['y'], c='green')
+            ax.legend(['data', 'COM', 'predefined'])
         plt.savefig(os.path.join(settings.REPORTS_PATH, filename))
         plt.show()
 
@@ -124,15 +125,20 @@ def main():
 
     data = Trade(file_path=settings.DATA_PATH)
     data.scale_coordinates(factor=10.0)
+    data.convert_reference_frame((5., 0))
+    data.scale_coordinates(factor=.1)
+    #test_resample = data.resample_data(expected_freq_hz=20)
     data.convert_reference_frame(displacement_vector=(10, 10))
     test_velocity = data.get_mean_velocity()
     test_com = data.get_com()
-    test_distance = data.get_com_distance_list(settings.PREDEFINED_POINTS_PATH)
-    data.get_plot(filename='interview_task_plot.jpg')
+    points = pd.read_csv(settings.PREDEFINED_POINTS_PATH, sep=',')
+    test_distance = data.get_com_distance_list(points)
+    data.get_plot(filename='interview_task_plot.jpg', predefined_points=None)
 
-    print(f'Trade statistics:\n 1. CENTER OF MASS:{test_com}, '
-          f'\n 3. MEAN VELOCITY: {test_velocity}'
-          f'\n 2. DISTANCES: {test_distance}')
+    print('Trade statistics:')
+    print(f' 1. CENTER OF MASS: {test_com},')
+    print(f' 2. MEAN VELOCITY: {test_velocity},')
+    print(f' 3. DISTANCES: {test_distance},')
 
 
 if __name__ == '__main__':
