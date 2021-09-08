@@ -1,20 +1,19 @@
 """
-Software prepared for initial signal processing and basic statistics generation useful for further analysis.
-Module contains main core of initial analysis of trade and functions which uploads needed input data from .csv file.
-Predefined points used in get_com_distance_list can be generated and saved to file -> class PredefinedPoints
+Software prepared for initial signal processing and basic statistics generation. Local paths to files could be changed
+in settings.py.
 """
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import timedelta
 import settings
 
 
 class Trade:
     """
-    Class prepared to generate basic statistics of drawn trace. Based on coordinates (x,y), software allows to obtain:
+    Class prepared to generate basic statistics of drawn trace. Based on coordinates (x,y) from input .csv data,
+    functions allow to obtain:
     - processing of the signal into a necessary sampling rate,
-    - conversion into different unit system and reference frame,
+    - conversion into different unit systems and reference frame,
     - calculation of the mean velocity, center of mass(COM) and distance between COM and predefined points,
     - visualisation of the trace, center of mass and predefined points.
     """
@@ -26,45 +25,35 @@ class Trade:
 
     def resample_data(self, expected_freq_hz=20):
         """
-        Function convert signal sampled with origin_freq_hz frequency into expected_freq_hz
-        :param data: data as DataFrame
-        :param origin_freq_hz: int value of origin sampling frequency in Hz
+        Function converts loaded DataFrame into data sampled with expected_freq_hz frequency.
         :param expected_freq_hz: int value of expected sampling frequency in Hz
-        :return: data
         """
-        # dorobić tą funkcję lepiej Bo nie działa!!!!!!!!!!!!!!!!!!!!!
-        self.data[string_column].subtract(self.data[string_column][0]).dt.total_seconds()
-        timedelta_test = timedelta(seconds=expected_freq_hz/1)
-
-        test = self.data.resample(rule=timedelta_test)
-        print('test resample')
+        self.data[self.datetime_column].subtract(self.data[self.datetime_column][0])  # To obtain timedelta column
+        rule_for_resampling = pd.Timedelta(1/expected_freq_hz, unit="s")
+        test = self.data.resample(rule=rule_for_resampling, on=self.datetime_column)
         return test
 
     def scale_coordinates(self, factor=10.0):
         """
-        Fuction which scales coordinates by multiplying x,y values with factor
-        :param data: data in DataFrame
+        Function scales coordinates in DataFrame by multiplying x,y values by the factor.
         :param factor: scalar for scaling coordinates
-        :return: data
         """
         self.data['x'] = self.data['x']*factor
         self.data['y'] = self.data['y']*factor
 
     def convert_reference_frame(self, displacement_vector=(0.0, 0.0)):
         """
-        Function convert reference frame into another used discplacement_vector
-        :param displacement_vector:
-        :return:
+        Function converts reference frame into another used displacement_vector.
+        :param displacement_vector: Tuple with two float step values for x(left) and y(right) axis
         """
         self.data['x'] = self.data['x'].subtract(displacement_vector[0])
         self.data['y'] = self.data['y'].subtract(displacement_vector[1])
 
     def get_mean_velocity(self):
         """
-        Function calculate mean velocity of drawn trace based on (x,y) coordinates and datetime vector.
+        Function calculates mean velocity of drawn trace based on (x,y) coordinates and datetime vector.
         First value is NaN due to the differences calculated between neighboring elements.
-        :param data: DataFrame with coordinates and time
-        :return: data
+        :return: Series with mean velocity values
         """
         diff_data = self.data.diff()
         velocity_x = diff_data['x'] / diff_data[self.datetime_column].dt.total_seconds()
@@ -75,9 +64,8 @@ class Trade:
 
     def get_com(self):
         """
-        Fuction calculate center of mass of signal as a list with two elements [x_com, y_com]
-        :param data:
-        :return:
+        Function calculates center of mass(COM) of signals x and y.
+        :return coordinates of COM
         """
         x_com = self.data['x'].mean()
         y_com = self.data['y'].mean()
@@ -85,8 +73,9 @@ class Trade:
 
     def get_com_distance_list(self, predefined_points):
         """
-        Function generate list of distances between predefined points (x,y) and center of mass from original .csv data
-        :return: list
+        Function calculates distances between DataFrame predefined points (x,y) and COM from original .csv input data.
+        :predefined points: DataFrame with points (x,y); predefined points need to be loaded from external file.
+        :return: list with distances values
         """
         com_x, com_y = self.get_com()
         distances_x = predefined_points['x'].subtract(com_x).pow(2)
@@ -97,11 +86,10 @@ class Trade:
 
     def get_plot(self, filename, predefined_points=None):
         """
-        Function to visualize trace, center of mass and predefined points
-        :param data: DataFrame with x,y coordinates
-        :param predefined_points: dataframe with predefined points
-        :param filename: string with extension
-        :return:
+        Function visualizes trace, center of mass and predefined points and saves result to file. It is possible to
+        generate plot without predefined points.
+        :param filename: name of figure with extension. File will be saved in REPORTS_PATH set in settings.py,
+        :param predefined_points: DataFrame with predefined points
         """
 
         com_x, com_y = self.get_com()
@@ -127,7 +115,7 @@ def main():
     data.scale_coordinates(factor=10.0)
     data.convert_reference_frame((5., 0))
     data.scale_coordinates(factor=.1)
-    #test_resample = data.resample_data(expected_freq_hz=20)
+    # test_resample = data.resample_data(expected_freq_hz=20)
     data.convert_reference_frame(displacement_vector=(10, 10))
     test_velocity = data.get_mean_velocity()
     test_com = data.get_com()

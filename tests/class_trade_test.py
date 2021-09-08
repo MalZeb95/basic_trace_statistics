@@ -1,5 +1,5 @@
 """
-Module with unit test for class Trade
+Module with unit test for class Trade. Paths to test data can be changed in settings.py.
 """
 import unittest
 import pandas as pd
