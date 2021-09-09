@@ -3,12 +3,16 @@ Software prepared for initial signal processing and basic statistics generation.
 in settings.py.
 """
 import os
-import pandas as pd
+
+import math
 import matplotlib.pyplot as plt
+import pandas as pd
+from typing import Union
+
 import settings
 
 
-class Trade:
+class Trace:
     """
     Class prepared to generate basic statistics of drawn trace. Based on coordinates (x,y) from input .csv data,
     functions allow to obtain:
@@ -17,29 +21,31 @@ class Trade:
     - calculation of the mean velocity, center of mass(COM) and distance between COM and predefined points,
     - visualisation of the trace, center of mass and predefined points.
     """
-    def __init__(self, file_path, separator='\t'):
 
-        self.data = pd.read_csv(file_path, sep=separator, dtype={'Unnamed: 0': str, 'x': float, 'y': float})
-        self.datetime_column = 'Unnamed: 0'  # Name of column with time and date string
-        self.data[self.datetime_column] = pd.to_datetime(self.data[self.datetime_column], format='%Y-%m-%d %H:%M:%S.%f')
+    def __init__(self, file_path, separator='\t', index_column=0):
+        self.data = pd.read_csv(file_path, sep=separator, dtype={'x': float, 'y': float}, index_col=index_column)
+        self.data.index = pd.to_datetime(self.data.index, format='%Y-%m-%d %H:%M:%S.%f')
 
-    def resample_data(self, expected_freq_hz=20):
+    def resample_data(self, original_freq_hz=50, expected_freq_hz=20, interpolation_method='linear'):
         """
         Function converts loaded DataFrame into data sampled with expected_freq_hz frequency.
+        :param original_freq_hz: int value of original sampling frequency in Hz
         :param expected_freq_hz: int value of expected sampling frequency in Hz
+        :param interpolation_method: string with name of interpolation method
         """
-        self.data[self.datetime_column].subtract(self.data[self.datetime_column][0])  # To obtain timedelta column
-        rule_for_resampling = pd.Timedelta(1/expected_freq_hz, unit="s")
-        test = self.data.resample(rule=rule_for_resampling, on=self.datetime_column)
-        return test
+        least_common_multiple = abs(original_freq_hz * expected_freq_hz) // math.gcd(original_freq_hz, expected_freq_hz)
+        rule_for_resampling = pd.Timedelta(1 / least_common_multiple, unit='s')
+        self.data = self.data.resample(rule=rule_for_resampling).interpolate(method=interpolation_method)
+        rule_for_resampling_2 = pd.Timedelta(1 / expected_freq_hz, unit="s")
+        self.data = self.data.resample(rule=rule_for_resampling_2).interpolate(method=interpolation_method)
 
-    def scale_coordinates(self, factor=10.0):
+    def scale_coordinates(self, factor=1.0):
         """
         Function scales coordinates in DataFrame by multiplying x,y values by the factor.
-        :param factor: scalar for scaling coordinates
+        :param factor: float scalar for scaling coordinates
         """
-        self.data['x'] = self.data['x']*factor
-        self.data['y'] = self.data['y']*factor
+        self.data['x'] *= factor
+        self.data['y'] *= factor
 
     def convert_reference_frame(self, displacement_vector=(0.0, 0.0)):
         """
@@ -56,8 +62,9 @@ class Trade:
         :return: Series with mean velocity values
         """
         diff_data = self.data.diff()
-        velocity_x = diff_data['x'] / diff_data[self.datetime_column].dt.total_seconds()
-        velocity_y = diff_data['y'] / diff_data[self.datetime_column].dt.total_seconds()
+        time_diff = self.data.index.to_series().diff()
+        velocity_x = diff_data['x'] / time_diff.dt.total_seconds()
+        velocity_y = diff_data['y'] / time_diff.dt.total_seconds()
         mean_velocity_temp = velocity_x.pow(2).add(velocity_y.pow(2))
         mean_velocity = mean_velocity_temp.pow(0.5)
         return mean_velocity
@@ -71,10 +78,10 @@ class Trade:
         y_com = self.data['y'].mean()
         return x_com, y_com
 
-    def get_com_distance_list(self, predefined_points):
+    def get_com_distance_list(self, predefined_points: pd.DataFrame):
         """
         Function calculates distances between DataFrame predefined points (x,y) and COM from original .csv input data.
-        :predefined points: DataFrame with points (x,y); predefined points need to be loaded from external file.
+        :param predefined_points: DataFrame with points (x,y); predefined points need to be loaded from external file.
         :return: list with distances values
         """
         com_x, com_y = self.get_com()
@@ -84,49 +91,50 @@ class Trade:
         distances = distances_temp.pow(0.5).tolist()
         return distances
 
-    def get_plot(self, filename, predefined_points=None):
+    def draw_plot(self, filename: str, predefined_points: Union[None, pd.DataFrame]):
         """
         Function visualizes trace, center of mass and predefined points and saves result to file. It is possible to
         generate plot without predefined points.
         :param filename: name of figure with extension. File will be saved in REPORTS_PATH set in settings.py,
         :param predefined_points: DataFrame with predefined points
         """
-
         com_x, com_y = self.get_com()
         fig, ax = plt.subplots()
         ax.plot(self.data['x'], self.data['y'])
         ax.scatter(com_x, com_y, c='orange')
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.legend(['data', 'COM'])
+        legend = ['data', 'COM']
         if predefined_points is not None:
             ax.scatter(predefined_points['x'], predefined_points['y'], c='green')
-            ax.legend(['data', 'COM', 'predefined'])
-        plt.savefig(os.path.join(settings.REPORTS_PATH, filename))
+            legend.append('predefined')
+        ax.legend(legend)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
         plt.show()
+        file_path = os.path.join(settings.REPORTS_PATH, filename)
+        if os.path.isfile(file_path):
+            print(f'{filename} is already exist. Select different name for file to save plot.')
+        else:
+            plt.savefig(file_path)
 
     def get_data(self):
         return self.data
 
 
 def main():
-
-    data = Trade(file_path=settings.DATA_PATH)
-    data.scale_coordinates(factor=10.0)
+    data = Trace(file_path=settings.DATA_PATH)
+    data.resample_data(original_freq_hz=50, expected_freq_hz=20, interpolation_method='linear')
+    data.scale_coordinates(factor=10.)
     data.convert_reference_frame((5., 0))
-    data.scale_coordinates(factor=.1)
-    # test_resample = data.resample_data(expected_freq_hz=20)
-    data.convert_reference_frame(displacement_vector=(10, 10))
-    test_velocity = data.get_mean_velocity()
-    test_com = data.get_com()
+    com = data.get_com()
+    mean_velocity = data.get_mean_velocity()
     points = pd.read_csv(settings.PREDEFINED_POINTS_PATH, sep=',')
-    test_distance = data.get_com_distance_list(points)
-    data.get_plot(filename='interview_task_plot.jpg', predefined_points=None)
+    distances = data.get_com_distance_list(points)
+    data.draw_plot(filename='new_plot.jpg', predefined_points=points)
 
-    print('Trade statistics:')
-    print(f' 1. CENTER OF MASS: {test_com},')
-    print(f' 2. MEAN VELOCITY: {test_velocity},')
-    print(f' 3. DISTANCES: {test_distance},')
+    print('Trace statistics:')
+    print(f' 1. CENTER OF MASS: {com},')
+    print(f' 2. MEAN VELOCITY: {mean_velocity},')
+    print(f' 3. DISTANCES: {distances},')
 
 
 if __name__ == '__main__':
